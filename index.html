@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RecipeVault — NoSQL Recipe Book</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ── Header ── -->
+<header>
+  <div class="logo">Recipe<span>Vault</span></div>
+  <div class="header-actions">
+    <button class="btn-primary" onclick="openAddModal()">+ Add Recipe</button>
+  </div>
+</header>
+
+<!-- ── Tagline Banner ── -->
+<div class="nosql-banner">
+  <strong>From Kitchen to Collection</strong>
+  <span>|</span>
+  Save, discover, and master every recipe you love
+</div>
+
+<!-- ── Main Content ── -->
+<div class="container">
+
+  <!-- Search & Filters -->
+  <div class="search-section">
+    <div class="search-wrap">
+      <span class="search-icon">&#9906;</span>
+      <input
+        type="text"
+        id="search-input"
+        placeholder="Search recipes by name or ingredient..."
+        oninput="filterRecipes()"
+      >
+    </div>
+    <select class="filter-select" id="category-filter" onchange="filterRecipes()">
+      <option value="">All categories</option>
+      <option value="Breakfast">Breakfast</option>
+      <option value="Lunch">Lunch</option>
+      <option value="Dinner">Dinner</option>
+      <option value="Dessert">Dessert</option>
+      <option value="Snack">Snack</option>
+      <option value="Drink">Drink</option>
+    </select>
+    <select class="filter-select" id="sort-filter" onchange="filterRecipes()">
+      <option value="newest">Newest first</option>
+      <option value="oldest">Oldest first</option>
+      <option value="az">A → Z</option>
+      <option value="time">By cook time</option>
+    </select>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-bar" id="stats-bar"></div>
+
+  <!-- Recipe Cards Grid -->
+  <div class="recipes-grid" id="recipes-grid"></div>
+</div>
+
+<!-- ── Add / Edit Modal ── -->
+<div class="modal-overlay" id="form-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 class="modal-title" id="form-modal-title">Add New Recipe</h2>
+      <button class="modal-close" onclick="closeModal('form-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-id">
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Recipe Name *</label>
+          <input type="text" class="form-input" id="f-name" placeholder="e.g. Shakshuka">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Category *</label>
+          <select class="form-select" id="f-category">
+            <option value="">Select...</option>
+            <option>Breakfast</option>
+            <option>Lunch</option>
+            <option>Dinner</option>
+            <option>Dessert</option>
+            <option>Snack</option>
+            <option>Drink</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Description</label>
+        <input type="text" class="form-input" id="f-desc" placeholder="A short description of the recipe">
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Prep Time (mins)</label>
+          <input type="number" class="form-input" id="f-prep" placeholder="15" min="0">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Cook Time (mins)</label>
+          <input type="number" class="form-input" id="f-cook" placeholder="30" min="0">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Servings</label>
+          <input type="number" class="form-input" id="f-servings" placeholder="4" min="1">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Difficulty</label>
+          <select class="form-select" id="f-difficulty">
+            <option>Easy</option>
+            <option>Medium</option>
+            <option>Hard</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Ingredients (one per line)</label>
+        <textarea class="form-textarea" id="f-ingredients" placeholder="2 cups flour&#10;1 tsp salt&#10;3 eggs"></textarea>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Instructions (one step per line)</label>
+        <textarea class="form-textarea" id="f-instructions" placeholder="Preheat oven to 200°C&#10;Mix dry ingredients&#10;Add wet ingredients and stir"></textarea>
+      </div>
+
+      <div class="form-actions">
+        <button class="btn-cancel" onclick="closeModal('form-modal')">Cancel</button>
+        <button class="btn-primary" onclick="saveRecipe()">Save Recipe</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── View Recipe Modal ── -->
+<div class="modal-overlay" id="view-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span></span>
+      <button class="modal-close" onclick="closeModal('view-modal')">✕</button>
+    </div>
+    <div class="modal-body" id="view-body"></div>
+  </div>
+</div>
+
+<!-- ── Confirm Delete Modal ── -->
+<div class="modal-overlay" id="confirm-modal">
+  <div class="confirm-dialog">
+    <h3 class="confirm-title">Delete this recipe?</h3>
+    <p class="confirm-text">This action cannot be undone. The recipe will be permanently removed from the database.</p>
+    <div style="display:flex; gap:10px; justify-content:flex-end;">
+      <button class="btn-cancel" onclick="closeModal('confirm-modal')">Cancel</button>
+      <button class="btn-danger" id="confirm-delete-btn">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Toast Notification ── -->
+<div class="toast" id="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
