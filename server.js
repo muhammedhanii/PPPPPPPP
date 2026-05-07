@@ -231,17 +231,12 @@ async function handleApi(req, res, pathname) {
 async function handleStatic(res, pathname) {
   const cleanedPath = pathname === '/' ? '/index.html' : pathname;
   const targetPath = path.resolve(ROOT_DIR, `.${cleanedPath}`);
-  const rootPath = await fs.realpath(ROOT_DIR);
-
-  if (targetPath !== ROOT_DIR && !targetPath.startsWith(`${ROOT_DIR}${path.sep}`)) {
-    sendText(res, 403, 'Forbidden');
-    return;
-  }
+  const resolvedRoot = await fs.realpath(ROOT_DIR);
 
   try {
     const resolvedTarget = await fs.realpath(targetPath);
 
-    if (resolvedTarget !== rootPath && !resolvedTarget.startsWith(`${rootPath}${path.sep}`)) {
+    if (resolvedTarget !== resolvedRoot && !resolvedTarget.startsWith(`${resolvedRoot}${path.sep}`)) {
       sendText(res, 403, 'Forbidden');
       return;
     }
