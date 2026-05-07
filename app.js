@@ -1,138 +1,77 @@
-// ============================================================
-// NoSQL Document Store Simulation
-// In a real app: MongoDB Atlas + Node.js/Express backend
-// Each document maps to a MongoDB document in a collection
-// ============================================================
-const DB = {
-  collection: "recipes",
-  documents: [],
-  opLog: [],
-  opCount: 0,
+const API = {
+  async request(path, options = {}) {
+    const response = await fetch(path, {
+      headers: { 'Content-Type': 'application/json' },
+      ...options
+    });
 
-  generateId() {
-    // Simulates MongoDB ObjectId generation
-    return 'doc_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    if (!response.ok) {
+      let message = 'Request failed.';
+      try {
+        const data = await response.json();
+        if (data && data.error) message = data.error;
+      } catch {
+        // Ignore parse errors and keep fallback message
+      }
+      throw new Error(message);
+    }
+
+    if (response.status === 204) return null;
+    return response.json();
   },
 
-  log(operation, data) {
-    const entry = `db.${this.collection}.${operation}(${JSON.stringify(data)})`;
-    this.opLog.unshift(entry);
-    this.opCount++;
+  listRecipes() {
+    return this.request('/api/recipes');
   },
 
-  // CREATE — db.recipes.insertOne(doc)
-  insertOne(doc) {
-    const newDoc = {
-      ...doc,
-      _id: this.generateId(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-    this.documents.push(newDoc);
-    this.log('insertOne', { name: doc.name, category: doc.category });
-    return newDoc;
+  createRecipe(recipe) {
+    return this.request('/api/recipes', {
+      method: 'POST',
+      body: JSON.stringify(recipe)
+    });
   },
 
-  // READ — db.recipes.find(query)
-  find(query = {}) {
-    this.log('find', query);
-    return this.documents.filter(doc =>
-      Object.entries(query).every(([k, v]) => doc[k] === v)
-    );
+  updateRecipe(id, recipe) {
+    return this.request(`/api/recipes/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      body: JSON.stringify(recipe)
+    });
   },
 
-  // READ — db.recipes.findOne({ _id })
-  findById(id) {
-    return this.documents.find(d => d._id === id);
-  },
-
-  // UPDATE — db.recipes.updateOne({ _id }, { $set: updates })
-  updateOne(id, updates) {
-    const idx = this.documents.findIndex(d => d._id === id);
-    if (idx === -1) return null;
-    this.documents[idx] = {
-      ...this.documents[idx],
-      ...updates,
-      updatedAt: new Date().toISOString()
-    };
-    this.log('updateOne', { _id: id, $set: { name: updates.name } });
-    return this.documents[idx];
-  },
-
-  // DELETE — db.recipes.deleteOne({ _id })
-  deleteOne(id) {
-    const idx = this.documents.findIndex(d => d._id === id);
-    if (idx === -1) return false;
-    this.documents.splice(idx, 1);
-    this.log('deleteOne', { _id: id });
-    return true;
+  deleteRecipe(id) {
+    return this.request(`/api/recipes/${encodeURIComponent(id)}`, {
+      method: 'DELETE'
+    });
   }
 };
 
-// ============================================================
-// Category Config — colors & emojis per category
-// ============================================================
+const state = {
+  recipes: []
+};
+
 const CATEGORY_CONFIG = {
   Breakfast: { color: '#BA7517', bg: '#FAEEDA', emoji: '🍳' },
-  Lunch:     { color: '#185FA5', bg: '#E6F1FB', emoji: '🥗' },
-  Dinner:    { color: '#3B6D11', bg: '#EAF3DE', emoji: '🍽️' },
-  Dessert:   { color: '#993556', bg: '#FBEAF0', emoji: '🍰' },
-  Snack:     { color: '#534AB7', bg: '#EEEDFE', emoji: '🫙' },
-  Drink:     { color: '#0F6E56', bg: '#E1F5EE', emoji: '🥤' },
+  Lunch: { color: '#185FA5', bg: '#E6F1FB', emoji: '🥗' },
+  Dinner: { color: '#3B6D11', bg: '#EAF3DE', emoji: '🍽️' },
+  Dessert: { color: '#993556', bg: '#FBEAF0', emoji: '🍰' },
+  Snack: { color: '#534AB7', bg: '#EEEDFE', emoji: '🫙' },
+  Drink: { color: '#0F6E56', bg: '#E1F5EE', emoji: '🥤' }
 };
 
-// ============================================================
-// Seed Data — preloaded sample recipes
-// ============================================================
-const SEEDS = [
-  {
-    name: "Shakshuka",
-    category: "Breakfast",
-    description: "Poached eggs in spiced tomato and pepper sauce, a classic Middle Eastern dish.",
-    prepTime: 10, cookTime: 25, servings: 4, difficulty: "Easy",
-    ingredients: "2 tbsp olive oil\n1 onion, diced\n3 garlic cloves\n2 cans crushed tomatoes\n1 tsp cumin\n1 tsp paprika\n4 eggs\nFresh parsley",
-    instructions: "Heat oil in a skillet\nSauté onion and garlic until soft\nAdd tomatoes and spices, simmer 15 mins\nMake wells and crack eggs in\nCover and cook 8 mins\nGarnish with parsley"
-  },
-  {
-    name: "Koshari",
-    category: "Dinner",
-    description: "Egypt's national dish — rice, lentils, pasta with a tangy tomato sauce.",
-    prepTime: 20, cookTime: 45, servings: 6, difficulty: "Medium",
-    ingredients: "1 cup rice\n1 cup lentils\n1 cup elbow pasta\n3 onions\n1 can tomato sauce\n4 garlic cloves\n1 tsp cumin\nOil for frying",
-    instructions: "Cook rice and lentils separately\nBoil pasta until al dente\nFry onions until crispy\nMake tomato garlic sauce\nLayer rice+lentils then pasta\nTop with sauce and crispy onions"
-  },
-  {
-    name: "Om Ali",
-    category: "Dessert",
-    description: "Egyptian bread pudding with nuts, coconut, and cream — a beloved classic.",
-    prepTime: 15, cookTime: 30, servings: 8, difficulty: "Easy",
-    ingredients: "4 croissants\n2 cups milk\n1 cup heavy cream\n1/2 cup sugar\n1/2 cup mixed nuts\n1/4 cup coconut flakes\nCinnamon",
-    instructions: "Preheat oven to 180°C\nTear croissants into pieces\nMix milk cream and sugar\nLayer bread in baking dish\nPour cream mixture over\nTop with nuts and coconut\nBake 25 mins until golden"
-  },
-  {
-    name: "Falafel Wrap",
-    category: "Lunch",
-    description: "Crispy fried chickpea patties wrapped in flatbread with tahini and veggies.",
-    prepTime: 20, cookTime: 15, servings: 4, difficulty: "Medium",
-    ingredients: "400g canned chickpeas\n1 onion\n3 garlic cloves\n1 tsp cumin\n1 tsp coriander\nFlat bread\nTahini\nTomatoes, lettuce",
-    instructions: "Blend chickpeas with onion and spices\nForm into small patties\nFry until golden brown\nWarm flatbreads\nAssemble with tahini and vegetables"
-  }
-];
-
-function seedDB() {
-  SEEDS.forEach(s => DB.insertOne(s));
-}
-
-// ============================================================
-// Render State
-// ============================================================
 let currentFilter = '';
 let currentSearch = '';
 let currentSort = 'newest';
 
+function esc(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
 function renderStats(docs) {
-  const total = DB.documents.length;
-  const cats = [...new Set(DB.documents.map(d => d.category))].length;
+  const total = state.recipes.length;
+  const cats = [...new Set(state.recipes.map((d) => d.category))].length;
   const shown = docs.length;
   document.getElementById('stats-bar').innerHTML = `
     <div class="stat-chip"><strong>${total}</strong> total recipes</div>
@@ -150,14 +89,16 @@ function filterRecipes() {
 }
 
 function renderGrid() {
-  let docs = [...DB.documents];
+  let docs = [...state.recipes];
 
-  if (currentFilter) docs = docs.filter(d => d.category === currentFilter);
-  if (currentSearch) docs = docs.filter(d =>
-    d.name.toLowerCase().includes(currentSearch) ||
-    d.description.toLowerCase().includes(currentSearch) ||
-    (d.ingredients || '').toLowerCase().includes(currentSearch)
-  );
+  if (currentFilter) docs = docs.filter((d) => d.category === currentFilter);
+  if (currentSearch) {
+    docs = docs.filter((d) =>
+      d.name.toLowerCase().includes(currentSearch) ||
+      (d.description || '').toLowerCase().includes(currentSearch) ||
+      (d.ingredients || '').toLowerCase().includes(currentSearch)
+    );
+  }
 
   if (currentSort === 'newest') docs.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   else if (currentSort === 'oldest') docs.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
@@ -177,9 +118,9 @@ function renderGrid() {
     return;
   }
 
-  grid.innerHTML = docs.map(doc => {
+  grid.innerHTML = docs.map((doc) => {
     const cfg = CATEGORY_CONFIG[doc.category] || { color: '#7A7568', bg: '#F2EFE8', emoji: '🍴' };
-    const totalTime = (parseInt(doc.prepTime) || 0) + (parseInt(doc.cookTime) || 0);
+    const totalTime = (parseInt(doc.prepTime, 10) || 0) + (parseInt(doc.cookTime, 10) || 0);
     return `
       <div class="recipe-card" onclick="viewRecipe('${doc._id}')">
         <div class="card-thumb" style="background:${cfg.bg}">${cfg.emoji}</div>
@@ -194,101 +135,102 @@ function renderGrid() {
           </div>
         </div>
         <div class="card-actions" onclick="event.stopPropagation()">
-          <button class="btn-sm btn-view"   onclick="viewRecipe('${doc._id}')">View</button>
-          <button class="btn-sm btn-edit"   onclick="openEditModal('${doc._id}')">Edit</button>
+          <button class="btn-sm btn-view" onclick="viewRecipe('${doc._id}')">View</button>
+          <button class="btn-sm btn-edit" onclick="openEditModal('${doc._id}')">Edit</button>
           <button class="btn-sm btn-delete" onclick="confirmDelete('${doc._id}')">Delete</button>
         </div>
       </div>`;
   }).join('');
 }
 
-// Escape HTML to prevent XSS
-function esc(str) {
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-}
-
-// ============================================================
-// CRUD: CREATE
-// ============================================================
 function openAddModal() {
   document.getElementById('form-modal-title').textContent = 'Add New Recipe';
   document.getElementById('edit-id').value = '';
-  ['name', 'desc', 'prep', 'cook', 'servings', 'ingredients', 'instructions'].forEach(f => {
-    document.getElementById('f-' + f).value = '';
+  ['name', 'desc', 'prep', 'cook', 'servings', 'ingredients', 'instructions'].forEach((f) => {
+    document.getElementById(`f-${f}`).value = '';
   });
   document.getElementById('f-category').value = '';
   document.getElementById('f-difficulty').value = 'Easy';
   openModal('form-modal');
 }
 
-// ============================================================
-// CRUD: UPDATE
-// ============================================================
 function openEditModal(id) {
-  const doc = DB.findById(id);
+  const doc = state.recipes.find((d) => d._id === id);
   if (!doc) return;
+
   document.getElementById('form-modal-title').textContent = 'Edit Recipe';
   document.getElementById('edit-id').value = id;
-  document.getElementById('f-name').value        = doc.name || '';
-  document.getElementById('f-desc').value        = doc.description || '';
-  document.getElementById('f-category').value    = doc.category || '';
-  document.getElementById('f-prep').value        = doc.prepTime || '';
-  document.getElementById('f-cook').value        = doc.cookTime || '';
-  document.getElementById('f-servings').value    = doc.servings || '';
-  document.getElementById('f-difficulty').value  = doc.difficulty || 'Easy';
+  document.getElementById('f-name').value = doc.name || '';
+  document.getElementById('f-desc').value = doc.description || '';
+  document.getElementById('f-category').value = doc.category || '';
+  document.getElementById('f-prep').value = doc.prepTime || '';
+  document.getElementById('f-cook').value = doc.cookTime || '';
+  document.getElementById('f-servings').value = doc.servings || '';
+  document.getElementById('f-difficulty').value = doc.difficulty || 'Easy';
   document.getElementById('f-ingredients').value = doc.ingredients || '';
   document.getElementById('f-instructions').value = doc.instructions || '';
   openModal('form-modal');
 }
 
-function saveRecipe() {
-  const name     = document.getElementById('f-name').value.trim();
+async function saveRecipe() {
+  const name = document.getElementById('f-name').value.trim();
   const category = document.getElementById('f-category').value;
-  if (!name)     { showToast('Please enter a recipe name.', 'error'); return; }
-  if (!category) { showToast('Please select a category.', 'error'); return; }
+  if (!name) {
+    showToast('Please enter a recipe name.', 'error');
+    return;
+  }
+  if (!category) {
+    showToast('Please select a category.', 'error');
+    return;
+  }
 
   const data = {
     name,
     category,
-    description:  document.getElementById('f-desc').value.trim(),
-    prepTime:     parseInt(document.getElementById('f-prep').value) || 0,
-    cookTime:     parseInt(document.getElementById('f-cook').value) || 0,
-    servings:     parseInt(document.getElementById('f-servings').value) || 1,
-    difficulty:   document.getElementById('f-difficulty').value,
-    ingredients:  document.getElementById('f-ingredients').value.trim(),
-    instructions: document.getElementById('f-instructions').value.trim(),
+    description: document.getElementById('f-desc').value.trim(),
+    prepTime: parseInt(document.getElementById('f-prep').value, 10) || 0,
+    cookTime: parseInt(document.getElementById('f-cook').value, 10) || 0,
+    servings: parseInt(document.getElementById('f-servings').value, 10) || 1,
+    difficulty: document.getElementById('f-difficulty').value,
+    ingredients: document.getElementById('f-ingredients').value.trim(),
+    instructions: document.getElementById('f-instructions').value.trim()
   };
 
-  const editId = document.getElementById('edit-id').value;
-  if (editId) {
-    DB.updateOne(editId, data);
-    showToast('Recipe updated successfully!', 'success');
-  } else {
-    DB.insertOne(data);
-    showToast('Recipe added to collection!', 'success');
+  try {
+    const editId = document.getElementById('edit-id').value;
+    if (editId) {
+      await API.updateRecipe(editId, data);
+      showToast('Recipe updated successfully!', 'success');
+    } else {
+      await API.createRecipe(data);
+      showToast('Recipe added to collection!', 'success');
+    }
+    closeModal('form-modal');
+    await refreshRecipes();
+    renderGrid();
+  } catch (error) {
+    showToast(error.message || 'Failed to save recipe.', 'error');
   }
-  closeModal('form-modal');
-  renderGrid();
 }
 
-// ============================================================
-// CRUD: READ (view single)
-// ============================================================
 function viewRecipe(id) {
-  const doc = DB.findById(id);
+  const doc = state.recipes.find((d) => d._id === id);
   if (!doc) return;
-  DB.log('findOne', { _id: id });
 
   const cfg = CATEGORY_CONFIG[doc.category] || { color: '#7A7568', bg: '#F2EFE8', emoji: '🍴' };
-  const totalTime = (parseInt(doc.prepTime) || 0) + (parseInt(doc.cookTime) || 0);
+  const totalTime = (parseInt(doc.prepTime, 10) || 0) + (parseInt(doc.cookTime, 10) || 0);
 
-  const ingredients = (doc.ingredients || '').split('\n').filter(Boolean)
-    .map(i => `<li>${esc(i)}</li>`).join('');
-  const steps = (doc.instructions || '').split('\n').filter(Boolean)
-    .map(s => `<li>${esc(s)}</li>`).join('');
+  const ingredients = (doc.ingredients || '')
+    .split('\n')
+    .filter(Boolean)
+    .map((i) => `<li>${esc(i)}</li>`)
+    .join('');
+
+  const steps = (doc.instructions || '')
+    .split('\n')
+    .filter(Boolean)
+    .map((s) => `<li>${esc(s)}</li>`)
+    .join('');
 
   document.getElementById('view-body').innerHTML = `
     <div class="view-emoji">${cfg.emoji}</div>
@@ -308,47 +250,52 @@ function viewRecipe(id) {
   openModal('view-modal');
 }
 
-// ============================================================
-// CRUD: DELETE
-// ============================================================
 let pendingDeleteId = null;
 function confirmDelete(id) {
   pendingDeleteId = id;
-  document.getElementById('confirm-delete-btn').onclick = () => {
-    DB.deleteOne(pendingDeleteId);
-    closeModal('confirm-modal');
-    renderGrid();
-    showToast('Recipe deleted.', 'info');
+  document.getElementById('confirm-delete-btn').onclick = async () => {
+    try {
+      await API.deleteRecipe(pendingDeleteId);
+      closeModal('confirm-modal');
+      await refreshRecipes();
+      renderGrid();
+      showToast('Recipe deleted.', 'info');
+    } catch (error) {
+      showToast(error.message || 'Failed to delete recipe.', 'error');
+    }
   };
   openModal('confirm-modal');
 }
 
-// ============================================================
-// Modal Helpers
-// ============================================================
-function openModal(id)  { document.getElementById(id).classList.add('active'); }
+function openModal(id) { document.getElementById(id).classList.add('active'); }
 function closeModal(id) { document.getElementById(id).classList.remove('active'); }
 
-document.querySelectorAll('.modal-overlay').forEach(overlay => {
-  overlay.addEventListener('click', e => {
+document.querySelectorAll('.modal-overlay').forEach((overlay) => {
+  overlay.addEventListener('click', (e) => {
     if (e.target === overlay) overlay.classList.remove('active');
   });
 });
 
-// ============================================================
-// Toast Notifications
-// ============================================================
 let toastTimer;
 function showToast(msg, type = 'success') {
   const t = document.getElementById('toast');
   t.textContent = msg;
-  t.className = 'toast ' + type + ' show';
+  t.className = `toast ${type} show`;
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
 }
 
-// ============================================================
-// App Init
-// ============================================================
-seedDB();
-renderGrid();
+async function refreshRecipes() {
+  state.recipes = await API.listRecipes();
+}
+
+async function initializeApp() {
+  try {
+    await refreshRecipes();
+    renderGrid();
+  } catch (error) {
+    showToast(error.message || 'Failed to load recipes.', 'error');
+  }
+}
+
+initializeApp();
