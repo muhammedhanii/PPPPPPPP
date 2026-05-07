@@ -10,6 +10,13 @@ const DATA_FILE = path.join(DATA_DIR, 'recipes.json');
 
 const CATEGORY_SET = new Set(['Breakfast', 'Lunch', 'Dinner', 'Dessert', 'Snack', 'Drink']);
 
+class HttpError extends Error {
+  constructor(statusCode, message) {
+    super(message);
+    this.statusCode = statusCode;
+  }
+}
+
 const SEED_RECIPES = [
   {
     name: 'Shakshuka',
@@ -72,13 +79,13 @@ function normalizeRecipe(input, { partial = false } = {}) {
 
   if ('name' in input || !partial) {
     const name = String(input.name || '').trim();
-    if (!name) throw new Error('Recipe name is required.');
+    if (!name) throw new HttpError(400, 'Recipe name is required.');
     output.name = name;
   }
 
   if ('category' in input || !partial) {
     const category = String(input.category || '').trim();
-    if (!CATEGORY_SET.has(category)) throw new Error('A valid category is required.');
+    if (!CATEGORY_SET.has(category)) throw new HttpError(400, 'A valid category is required.');
     output.category = category;
   }
 
@@ -148,7 +155,7 @@ function parseJsonBody(req) {
     req.on('data', (chunk) => {
       body += chunk;
       if (body.length > 1_000_000) {
-        reject(new Error('Request body is too large.'));
+        reject(new HttpError(413, 'Request body is too large.'));
         req.destroy();
       }
     });
@@ -157,7 +164,7 @@ function parseJsonBody(req) {
       try {
         resolve(JSON.parse(body));
       } catch {
-        reject(new Error('Invalid JSON payload.'));
+        reject(new HttpError(400, 'Invalid JSON payload.'));
       }
     });
     req.on('error', reject);
@@ -250,8 +257,8 @@ const server = http.createServer(async (req, res) => {
 
     await handleStatic(res, pathname);
   } catch (error) {
+    const status = error instanceof HttpError ? error.statusCode : 500;
     const message = error && error.message ? error.message : 'Internal server error.';
-    const status = message.includes('required') || message.includes('valid') || message.includes('JSON') || message.includes('large') ? 400 : 500;
     sendJson(res, status, { error: message });
   }
 });
