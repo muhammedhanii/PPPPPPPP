@@ -69,6 +69,13 @@ function esc(str) {
     .replace(/>/g, '&gt;');
 }
 
+function hydrateRecipes(recipes) {
+  return recipes.map((recipe) => ({
+    ...recipe,
+    totalTime: (parseInt(recipe.prepTime, 10) || 0) + (parseInt(recipe.cookTime, 10) || 0)
+  }));
+}
+
 function renderStats(docs) {
   const total = state.recipes.length;
   const cats = [...new Set(state.recipes.map((d) => d.category))].length;
@@ -120,7 +127,6 @@ function renderGrid() {
 
   grid.innerHTML = docs.map((doc) => {
     const cfg = CATEGORY_CONFIG[doc.category] || { color: '#7A7568', bg: '#F2EFE8', emoji: '🍴' };
-    const totalTime = (parseInt(doc.prepTime, 10) || 0) + (parseInt(doc.cookTime, 10) || 0);
     return `
       <div class="recipe-card" onclick="viewRecipe('${doc._id}')">
         <div class="card-thumb" style="background:${cfg.bg}">${cfg.emoji}</div>
@@ -129,7 +135,7 @@ function renderGrid() {
           <div class="card-title">${esc(doc.name)}</div>
           <div class="card-desc">${esc(doc.description || '')}</div>
           <div class="card-meta">
-            <span>⏱ ${totalTime} min</span>
+            <span>⏱ ${doc.totalTime} min</span>
             <span>👤 ${doc.servings || '—'} servings</span>
             <span>📊 ${doc.difficulty || 'Easy'}</span>
           </div>
@@ -218,7 +224,6 @@ function viewRecipe(id) {
   if (!doc) return;
 
   const cfg = CATEGORY_CONFIG[doc.category] || { color: '#7A7568', bg: '#F2EFE8', emoji: '🍴' };
-  const totalTime = (parseInt(doc.prepTime, 10) || 0) + (parseInt(doc.cookTime, 10) || 0);
 
   const ingredients = (doc.ingredients || '')
     .split('\n')
@@ -239,7 +244,7 @@ function viewRecipe(id) {
     </div>
     <h2 class="view-title" style="text-align:center">${esc(doc.name)}</h2>
     <div class="view-meta" style="justify-content:center">
-      <span>⏱ ${totalTime} min total</span>
+      <span>⏱ ${doc.totalTime} min total</span>
       <span>👤 ${doc.servings} servings</span>
       <span>📊 ${doc.difficulty}</span>
     </div>
@@ -286,7 +291,7 @@ function showToast(msg, type = 'success') {
 }
 
 async function refreshRecipes() {
-  state.recipes = await API.listRecipes();
+  state.recipes = hydrateRecipes(await API.listRecipes());
 }
 
 async function initializeApp() {

@@ -229,18 +229,27 @@ async function handleApi(req, res, pathname) {
 
 async function handleStatic(res, pathname) {
   const cleanedPath = pathname === '/' ? '/index.html' : pathname;
-  const targetPath = path.normalize(path.join(ROOT_DIR, cleanedPath));
-
-  if (!targetPath.startsWith(ROOT_DIR)) {
-    sendText(res, 403, 'Forbidden');
-    return;
-  }
+  const targetPath = path.resolve(ROOT_DIR, `.${cleanedPath}`);
 
   try {
+    const [resolvedRoot, resolvedTarget] = await Promise.all([
+      fs.realpath(ROOT_DIR),
+      fs.realpath(targetPath)
+    ]);
+
+    if (resolvedTarget !== resolvedRoot && !resolvedTarget.startsWith(`${resolvedRoot}${path.sep}`)) {
+      sendText(res, 403, 'Forbidden');
+      return;
+    }
+
     const content = await fs.readFile(targetPath);
     res.writeHead(200, { 'Content-Type': getContentType(targetPath) });
     res.end(content);
-  } catch {
+  } catch (error) {
+    if (error && error.code === 'ENOENT') {
+      sendText(res, 404, 'Not found');
+      return;
+    }
     sendText(res, 404, 'Not found');
   }
 }
