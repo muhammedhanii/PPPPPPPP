@@ -250,7 +250,7 @@ async function handleStatic(res, pathname) {
       sendText(res, 404, 'Not found');
       return;
     }
-    sendText(res, 404, 'Not found');
+    sendText(res, 500, 'Internal server error');
   }
 }
 

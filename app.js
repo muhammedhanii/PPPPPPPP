@@ -110,7 +110,7 @@ function renderGrid() {
   if (currentSort === 'newest') docs.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   else if (currentSort === 'oldest') docs.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   else if (currentSort === 'az') docs.sort((a, b) => a.name.localeCompare(b.name));
-  else if (currentSort === 'time') docs.sort((a, b) => (a.cookTime + a.prepTime) - (b.cookTime + b.prepTime));
+  else if (currentSort === 'time') docs.sort((a, b) => a.totalTime - b.totalTime);
 
   renderStats(docs);
 
@@ -272,8 +272,13 @@ function confirmDelete(id) {
   openModal('confirm-modal');
 }
 
-function openModal(id) { document.getElementById(id).classList.add('active'); }
-function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+function openModal(id) {
+  document.getElementById(id).classList.add('active');
+}
+
+function closeModal(id) {
+  document.getElementById(id).classList.remove('active');
+}
 
 document.querySelectorAll('.modal-overlay').forEach((overlay) => {
   overlay.addEventListener('click', (e) => {
