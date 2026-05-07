@@ -4,6 +4,7 @@ const { randomUUID } = require('crypto');
 const { promises: fs } = require('fs');
 
 const PORT = Number(process.env.PORT) || 3000;
+const MAX_BODY_SIZE = Number(process.env.MAX_BODY_SIZE_BYTES) || 1_000_000;
 const ROOT_DIR = __dirname;
 const DATA_DIR = path.join(ROOT_DIR, 'data');
 const DATA_FILE = path.join(DATA_DIR, 'recipes.json');
@@ -154,7 +155,7 @@ function parseJsonBody(req) {
     let body = '';
     req.on('data', (chunk) => {
       body += chunk;
-      if (body.length > 1_000_000) {
+      if (body.length > MAX_BODY_SIZE) {
         reject(new HttpError(413, 'Request body is too large.'));
         req.destroy();
       }
@@ -230,20 +231,23 @@ async function handleApi(req, res, pathname) {
 async function handleStatic(res, pathname) {
   const cleanedPath = pathname === '/' ? '/index.html' : pathname;
   const targetPath = path.resolve(ROOT_DIR, `.${cleanedPath}`);
+  const rootPath = await fs.realpath(ROOT_DIR);
+
+  if (targetPath !== ROOT_DIR && !targetPath.startsWith(`${ROOT_DIR}${path.sep}`)) {
+    sendText(res, 403, 'Forbidden');
+    return;
+  }
 
   try {
-    const [resolvedRoot, resolvedTarget] = await Promise.all([
-      fs.realpath(ROOT_DIR),
-      fs.realpath(targetPath)
-    ]);
+    const resolvedTarget = await fs.realpath(targetPath);
 
-    if (resolvedTarget !== resolvedRoot && !resolvedTarget.startsWith(`${resolvedRoot}${path.sep}`)) {
+    if (resolvedTarget !== rootPath && !resolvedTarget.startsWith(`${rootPath}${path.sep}`)) {
       sendText(res, 403, 'Forbidden');
       return;
     }
 
-    const content = await fs.readFile(targetPath);
-    res.writeHead(200, { 'Content-Type': getContentType(targetPath) });
+    const content = await fs.readFile(resolvedTarget);
+    res.writeHead(200, { 'Content-Type': getContentType(resolvedTarget) });
     res.end(content);
   } catch (error) {
     if (error && error.code === 'ENOENT') {
